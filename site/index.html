@@ -1,0 +1,64 @@
+<html>
+    <head>
+        <style type="text/css">
+            canvas { border: 1px solid black;  width: 99%; }
+            hidden { visibility: hidden; }
+        </style>
+        <script type="module">
+          // require dom.moduleScripts.enabled under ff... TODO put in another file
+          import cv from './site.js';
+          function dirty_nav(n,dest) {
+            if (dest == undefined) {
+              n.style.visibility = "hidden";
+              n.href = "";
+            } else {
+              n.style.visibility = "visible";
+              n.href = "?" + dest;
+            }
+          }
+
+          function disp_canvas ({file,x,y,mode,next,previous},pass) {
+
+              dirty_nav(document.getElementById('next'),next);
+              dirty_nav(document.getElementById('prev'),previous);
+
+              var pass = document.getElementById('pass').value;
+              var canvas = document.getElementById('canvas');
+              var ctx = canvas.getContext('2d');
+              canvas.width=x;
+              canvas.height=y;
+              ctx.fillStyle = 'green';
+              var x = ctx.canvas.width*4;
+              var y = ctx.canvas.height*4;
+              ctx.fillRect(0, 0, x, y);
+              cv.download(ctx,file,mode,pass)
+          }
+
+          window.cur_url= new URL(window.location.href);
+          window.xhrconf = new XMLHttpRequest();
+          xhrconf.responseType = 'json';
+          xhrconf.onload = function() {
+            disp_canvas(this.response);
+          }
+
+          xhrconf.open('GET','./'+ cur_url.search.substring(1) + '.json');
+          xhrconf.send();
+
+        </script>
+    </head>
+    <body>
+        <div>
+           <span >
+             <a id="prev">prev</a>
+           </span>
+           Passphrase: <input id="pass" type="text" oninput="xhrconf.onload()" />
+           <span >
+             <a id="next">next</a>
+           </span>
+        </div>
+        
+        <div>
+           <canvas id="canvas"></canvas>
+        </div>
+    </body>
+</html>

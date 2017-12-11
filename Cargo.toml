@@ -1,0 +1,19 @@
+[package]
+
+name = "cv"
+version = "0.0.1"
+authors = ["Emeric Chevalier <emericchevalier.pro@gmail.com>"]
+
+[[example]]
+name='init_a_pic'
+path = "examples/init_a_pic.rs"
+
+
+[dependencies]
+compress="~0.1.2"
+
+[dev-dependencies]
+image="~0.18.0"
+lz4="~1.22"
+
+
