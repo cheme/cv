@@ -47,7 +47,13 @@ fn transform(file : PathBuf, file_name : OsString) -> IoResult<()> {
     }); 
   decompress(dest_path(dest,file_name,"_c1").as_path(),dest_path(dest,file_name,"_dc1").as_path())?;
   to_full_pic(file.as_path(),dest_path(dest,file_name,"_fp").as_path())?;
-  let mut f = File::open(file.as_path())?;
+   Command::new("lz4")
+        .arg("-9")
+        .arg(dest_path(dest,file_name,"_fp").as_path())
+        .arg(dest_path(dest,file_name,"_c2").as_path())
+        .output().unwrap_or_else(|e| {
+            panic!("failed to execute process: {}", e)
+    }); 
 
   Ok(())
 }
