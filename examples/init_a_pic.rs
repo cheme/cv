@@ -47,7 +47,7 @@ fn transform(file : PathBuf, file_name : OsString) -> IoResult<()> {
     }); 
   decompress(dest_path(dest,file_name,"_c1").as_path(),dest_path(dest,file_name,"_dc1").as_path())?;
   to_full_pic(file.as_path(),dest_path(dest,file_name,"_fp").as_path())?;
-   Command::new("lz4")
+  Command::new("lz4")
         .arg("-9")
         .arg(dest_path(dest,file_name,"_fp").as_path())
         .arg(dest_path(dest,file_name,"_c2").as_path())
@@ -65,6 +65,7 @@ fn dest_path(dest : &PathBuf, file_name : &OsString, xt : &str) -> PathBuf {
   path.push(fname);
   path
 }
+
 fn to_full_pic(src: &Path, dst: &Path) -> IoResult<()>
 {
 	println!("expand png: {:?} -> {:?}", src, dst);
