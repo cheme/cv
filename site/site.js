@@ -1,6 +1,9 @@
 var x;
 var y;
 var ctx;
+var blob;
+var blob_array_buff;
+var reader = new FileReader();
 var blobbuffer_size = 1024;
 // nb line read from blob : 20
 var readerline = 20;
@@ -10,7 +13,8 @@ var innerreaderline = 4;
 var wasm_mod = {};
 //dim : 2480, 3508
 //rowlen : 7440
-function direct_display(b,ctx) {
+function direct_display(b) {
+  var b = blob;
   console.log(b.size)
   console.log(b.type)
   console.log('x: ', x);
@@ -39,12 +43,19 @@ function direct_display(b,ctx) {
   }
 
 }
-
+// for debugging only
+function touch (ix) {
+  console.log("touch : " + ix);
+}
 function load_wasm_mod (cb) {
   fetch("cv.wasm").then(response =>
     response.arrayBuffer()
   ).then(bytes =>
-    WebAssembly.instantiate(bytes, { env: { draw_px : draw_px } })
+    WebAssembly.instantiate(bytes, { env: {
+            touch : touch,
+            draw_px : draw_px,
+            update_from_blob : update_from_blob
+    } })
   ).then(results => {
     console.log("got instance");
     console.log(results);
@@ -58,18 +69,16 @@ function load_wasm_mod (cb) {
   });
 }
 
-function compress_display(b,ctx) {
+function compress_display() {
+  var b = blob;
+  b.cur_ix = 0;
   var dec = (r) => {
    // TODO replace by read buffer!!
    var l = r.byteLength;
-   var buf_read_add = wasm_mod.alloc(l);
-   var buffer = new Uint8Array(wasm_mod.memory.buffer, buf_read_add, l);
-   // copy TODO buff it
-   buffer.set(new Uint8Array(r));
-   // var buffer2 = new Uint8Array(wasm_mod.memory.buffer, buf_read_add, l);
-   // this in debugging asserts that previous does copy mem on ff and chromium 
-   // copy TODO buff it
-   wasm_mod.decompress_display(buf_read_add,l,x / 4,innerreaderline);
+   blob_array_buff = r;
+   var buff_l = Math.min(l,blobbuffer_size);
+   var buf_read_add = wasm_mod.alloc(buff_l);
+   wasm_mod.decompress_display(buf_read_add, buff_l,l,x / 4,innerreaderline);
           // TODO put in promise and dealloc in finally
    wasm_mod.dealloc(buf_read_add);
   };
@@ -96,6 +105,18 @@ function draw_px(array_pt,nb_line,line_w,y_ix) {
   var buffer = new Uint8ClampedArray(wasm_mod.memory.buffer, array_pt, nb_line * 4 * line_w);
   draw_px_inner(buffer,nb_line,line_w,y_ix);
 }
+
+function update_from_blob(array_pt, arr_l, ret_l) {
+  var end_r = Math.min(blob.cur_ix+arr_l,blob_array_buff.byteLength);
+  var length = end_r - blob.cur_ix;
+  var buffer = new Uint8Array(wasm_mod.memory.buffer, array_pt, length);
+  buffer.set(new Uint8Array(blob_array_buff.slice(blob.cur_ix,end_r)));
+  blob.cur_ix = end_r;
+
+  var res_buf = new Uint8Array(wasm_mod.memory.buffer, ret_l, 4);
+  putInt32Bytes( length,res_buf );
+}
+
 function draw_px_inner(buffer,nb_line,line_w,y_ix) {
   var idi = new ImageData(buffer,line_w, nb_line);
   ctx.putImageData(idi,0,y_ix);
@@ -118,10 +139,11 @@ function download_cv(ctx2,file,mode,pass) {
     // xhr.response is a Blob
     var url = URL.createObjectURL(xhr.response);
     console.log('URL: ', url);
+    blob = xhr.response;
     if (mode === 'direct') {
-        direct_display(xhr.response,ctx);
+        direct_display();
     } else if (mode === 'compress') {
-        compress_display(xhr.response,ctx);
+        compress_display();
     } else {
         console.log("unknow deser mode");
     }
@@ -146,6 +168,16 @@ function preader (b,start,end) {
 
   reader.readAsArrayBuffer(b.slice(start,end)); 
  });
+}
+
+
+function putInt32Bytes( x,bytes ){
+    var i = 0;
+    do {
+    bytes[i++] = x & (255);
+    x = x>>8;
+    } while ( i < 4 )
+    return bytes;
 }
 
 export default cv;

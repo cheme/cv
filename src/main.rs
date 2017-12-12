@@ -7,6 +7,7 @@ extern crate compress;
 
 use std::heap::{Alloc, Heap, Layout};
 use std::mem;
+use std::cmp::min;
 
 use std::slice;
 use std::iter::repeat;
@@ -25,22 +26,24 @@ use std::io::{
   Cursor,
   Read,
   Write,
+  Result as IoResult,
 };
 
 extern {
 //function draw_px(array,ctx,nb_line,line_w,y_ix) {
   fn draw_px(_ : *mut u8, _ : usize, _ : usize, _ : usize);
+  fn update_from_blob(_ : *mut u8, _ : usize, _ : *mut i32);
+  fn touch(_ : usize);
 }
 
 //function direct_display(b,ctx) {
 #[no_mangle]
-pub extern "C" fn decompress_display(data: *mut u8, length : usize, width : usize, nb_line_disp : usize) {
-  println!("in!!!");
-  let data = unsafe {
-    slice::from_raw_parts_mut(data, length)
+pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, length : usize, width : usize, nb_line_disp : usize) {
+  let empty_buff = unsafe {
+    slice::from_raw_parts_mut(empty_buff, buf_length)
   }; 
 
-  let input = Cursor::new(data);
+  let input = BlobReader::new(empty_buff);
 
   //let mut disp_buf = Vec::with_capacity(width * 4 * nb_line_disp);
   let mut disp_buf = vec![0;width * 4 * nb_line_disp];
@@ -113,3 +116,42 @@ pub extern "C" fn dealloc(ptr: *mut c_void, cap: usize) {
 */
 // dummy
 fn main() {}
+
+struct BlobReader<'a> {
+  buf : &'a mut [u8],
+  ix : usize,
+  end : usize,
+}
+
+impl<'a> BlobReader<'a> {
+  pub fn new(buf : &'a mut [u8]) -> Self {
+    BlobReader{
+      buf,
+      ix : 0,
+      end : 0 
+    }
+  }
+}
+impl<'a> Read for BlobReader<'a> {
+  fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+
+    if self.ix == self.end {
+      let l = self.buf.len();
+      let mut nb = 0;
+      unsafe { update_from_blob(self.buf.as_mut_ptr(), l, &mut nb) };
+      let nb = nb as usize;
+      // unsafe { touch(self.buf[0] as usize) };
+      if nb == 0 {
+        return Ok(0);
+      }
+      self.end = nb;
+      self.ix = 0;
+    }
+
+    let nb_copy = min(buf.len(), self.end - self.ix);
+    buf[..nb_copy].copy_from_slice(&self.buf[self.ix..self.ix+nb_copy]);
+    self.ix += nb_copy;
+
+    Ok(nb_copy)
+  }
+}
