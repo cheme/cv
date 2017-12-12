@@ -9,8 +9,11 @@ name='init_a_pic'
 path = "examples/init_a_pic.rs"
 
 
-[dependencies]
-compress="~0.1.2"
+[dependencies.compress]
+#version = "~0.1.2"
+git = "https://github.com/cheme/rust-compress.git"
+default-features = false
+features = ["lz4"]
 
 [dev-dependencies]
 image="~0.18.0"
