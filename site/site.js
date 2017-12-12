@@ -1,6 +1,7 @@
 var x;
 var y;
 var ctx;
+var blobbuffer_size = 1024;
 // nb line read from blob : 20
 var readerline = 20;
 // nb line displayed at the same time : 4
