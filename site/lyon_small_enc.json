@@ -1,0 +1,17 @@
+{
+        "file" : "../output/lyon_small.png_c2_enc",
+        "x" : 640,
+        "y" : 480,
+        "mode" : "compress_enc",
+        "modeconf" : {
+                "keyder" : {
+                        "type" : "bcript",
+                        "nbround" : "16",
+                        "salt" : "O+66Gwcsy87Nt1CR55KOYUM9jbNVYF1eBx3FNtjKcfA=",
+                        "pass_byte_torem" : "bWluZXBhc3NwaHJhc2U=",
+                        "pass_derbyte_torem" : " wenK2H9leftFnBh1vcKkD6hwAI/fSSaUXck1iRlq/1M="
+                },
+                "type" : "xchacha20",
+                "salt" : "EAbxyW5Amol7r+LDkqhOHt8balQm6n2A"
+        }
+}

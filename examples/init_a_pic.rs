@@ -1,6 +1,14 @@
 extern crate image;
+extern crate crypto;
 extern crate lz4;
+extern crate base64;
 extern crate compress;
+extern crate rand;
+use crypto::bcrypt_pbkdf::bcrypt_pbkdf;
+use crypto::chacha20::ChaCha20;
+use crypto::symmetriccipher::SynchronousStreamCipher;
+use rand::OsRng;
+use rand::Rng;
 use std::process::Command;
 use image::png::PNGDecoder;
 use image::ImageDecoder;
@@ -24,6 +32,8 @@ use std::io::{
 };
 const inputspath : &str = "./input/";
 const outputspath : &str = "./output/";
+const passphrase : &str = "minepassphrase";
+const nbround : u32 = 16;
 fn main() {
   for e in fs::read_dir(inputspath).unwrap() {
     let e = e.unwrap();
@@ -54,6 +64,32 @@ fn transform(file : PathBuf, file_name : OsString) -> IoResult<()> {
         .output().unwrap_or_else(|e| {
             panic!("failed to execute process: {}", e)
     }); 
+  let mut salt = vec![0;32];
+  let mut pass_bytes = vec![0;32];
+  OsRng::new().unwrap().fill_bytes(&mut salt);
+  let salt = salt;
+  bcrypt_pbkdf(&passphrase.as_bytes()[..],&salt[..],nbround,&mut pass_bytes[..]);
+  println!("passphrase : {}", &passphrase);
+  println!("passphrasebyte : {}", base64::encode(&passphrase.as_bytes()));
+  println!("salt : {}", base64::encode(&salt));
+  println!("nbround : {}", nbround);
+  println!("derived key : {}", base64::encode(&pass_bytes));
+
+
+  let salt_c1 = encipher(dest_path(dest,file_name,"_fp").as_path(),dest_path(dest,file_name,"_fp_enc").as_path(),&pass_bytes[..])?;
+/*    Command::new("lz4")
+        .arg("-9")
+        .arg(dest_path(dest,file_name,"_fp_enc").as_path())
+        .arg(dest_path(dest,file_name,"_c3").as_path())
+        .output().unwrap_or_else(|e| {
+            panic!("failed to execute process: {}", e)
+    }); */
+
+  let salt_c2 = encipher(dest_path(dest,file_name,"_c2").as_path(),dest_path(dest,file_name,"_c2_enc").as_path(),&pass_bytes[..])?;
+
+//  decipher(dest_path(dest,file_name,"_fp_enc").as_path(),dest_path(dest,file_name,"_fp_dec").as_path(),&pass_bytes[..],&salt_c1[..])?;
+  decipher(dest_path(dest,file_name,"_c2_enc").as_path(),dest_path(dest,file_name,"_c2_dec").as_path(),&pass_bytes[..],&salt_c2[..])?;
+
 
   Ok(())
 }
@@ -69,7 +105,7 @@ fn dest_path(dest : &PathBuf, file_name : &OsString, xt : &str) -> PathBuf {
 fn to_full_pic(src: &Path, dst: &Path) -> IoResult<()>
 {
 	println!("expand png: {:?} -> {:?}", src, dst);
-	let mut fi = try!(File::open(src));
+	let fi = try!(File::open(src));
 	let mut fo = try!(File::create(dst));
   let mut dec = PNGDecoder::new(fi);
   let (x,y) = dec.dimensions().unwrap();
@@ -110,6 +146,54 @@ fn to_full_pic(src: &Path, dst: &Path) -> IoResult<()>
 
 }
  
+fn encipher(src: &Path, dst: &Path,key : &[u8]) -> IoResult<Vec<u8>> {
+	println!("enciph: {:?} -> {:?}", src, dst);
+  let mut salt_bciph = vec![0;24];
+  OsRng::new().unwrap().fill_bytes(&mut salt_bciph);
+  let salt_bciph = salt_bciph;
+  println!("salt ciph : {}", base64::encode(&salt_bciph));
+
+  decipher(src,dst,key,&salt_bciph[..])?;
+
+  Ok(salt_bciph)
+}
+#[inline]
+fn read_most<R : Read>(from : &mut R, to : &mut [u8]) -> IoResult<usize> {
+  let mut i = 0;
+  while i != to.len() {
+    let nb = from.read(&mut to[i..])?;
+    if nb == 0 {
+      return Ok(i);
+    }
+    i += nb;
+  }
+  Ok(i)
+}
+
+fn decipher(src: &Path, dst: &Path,key : &[u8], salt_bciph : &[u8]) -> IoResult<()> {
+	let mut fi = try!(File::open(src));
+	let mut fo = try!(File::create(dst));
+  // stream gen at this size
+  let mut input = vec![0;64];
+  let mut output = vec![0;64];
+  let mut xchacha20 = ChaCha20::new_xchacha20(&key, &salt_bciph);
+  loop {
+    let s = read_most(&mut fi, &mut input[..])?;
+    if s == 0 {
+      break;
+    }
+
+    xchacha20.process(&input[..s], &mut output[..s]);
+    fo.write_all(&output[..s])?;
+    if s != input.len() {
+      break;
+    }
+  }
+  Ok(())
+
+
+}
+
 // differs from std tools could not decode -> use lz4 command to compress
 /*fn compress(src: &Path, dst: &Path) -> IoResult<()>
 {

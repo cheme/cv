@@ -1,0 +1,15 @@
+{
+        "file" : "../output/lyon_small.png_fp_enc",
+        "x" : 640,
+        "y" : 480,
+        "mode" : "enc_only",
+        "modeconf" : {
+                "keyder" : {
+                        "type" : "bcript",
+                        "nbround" : "16",
+                        "salt" : "lmBfs1LEC2/yb+P6IAqioqhqKKPreEfMLrJd9AhiDYY="
+                },
+                "type" : "xchacha20",
+                "salt" : "Y6O56Z+YnkLlEI/M6abMtkqxYc7rRlIW"
+        }
+}

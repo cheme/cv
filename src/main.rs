@@ -5,6 +5,11 @@
 
 extern crate compress;
 
+extern crate crypto;
+
+use crypto::chacha20::ChaCha20;
+use crypto::symmetriccipher::SynchronousStreamCipher;
+use crypto::bcrypt_pbkdf::bcrypt_pbkdf;
 use std::heap::{Alloc, Heap, Layout};
 use std::mem;
 use std::cmp::min;
@@ -36,6 +41,76 @@ extern {
   fn touch(_ : usize);
 }
 
+#[no_mangle]
+pub extern "C" fn bcrypt_key_der(pass : *const u8, pass_length : usize, salt : *const u8, nb_round : u32) -> *const u8 {
+  let pass = unsafe {
+    slice::from_raw_parts(pass, pass_length)
+  }; 
+  let salt = unsafe {
+    slice::from_raw_parts(salt, 32)
+  }; 
+  let mut output = vec![0;32];
+  bcrypt_pbkdf(&pass[..],&salt[..],nb_round,&mut output[..]);
+
+  mem::forget(&output);
+  return output.as_ptr() as *const u8;
+}
+
+#[no_mangle]
+pub extern "C" fn pbkdf_test(nb_round : u32) {
+  let pass = vec![8;30];
+  let salt = vec![1;32];
+  let mut output = vec![0;32];
+  unsafe { touch(nb_round as usize) };
+  bcrypt_pbkdf(&pass[..],&salt[..],nb_round,&mut output[..]);
+  unsafe { touch(nb_round as usize +1) };
+}
+
+#[no_mangle]
+pub extern "C" fn decompress_enc_display(empty_buff: *mut u8, buf_length : usize, length : usize, width : usize, nb_line_disp : usize,pass_buff: *const u8,salt_buff: *const u8) {
+ let empty_buff = unsafe {
+    slice::from_raw_parts_mut(empty_buff, buf_length)
+ };
+ let pass = unsafe {
+    slice::from_raw_parts(pass_buff, 32)
+ }; 
+ let salt = unsafe {
+    slice::from_raw_parts(salt_buff, 24)
+ }; 
+
+
+
+ let input = BlobReader::new(empty_buff);
+
+ let dec_read = ChaChaReader::new(input,pass,salt);
+ let mut dec_i = LZDec::new(dec_read);
+
+  write_pic_from_read(&mut dec_i, width, nb_line_disp).unwrap();
+
+}
+
+#[no_mangle]
+pub extern "C" fn enc_display(empty_buff: *mut u8, buf_length : usize, length : usize, width : usize, nb_line_disp : usize,pass_buff: *const u8,salt_buff: *const u8) {
+ let empty_buff = unsafe {
+    slice::from_raw_parts_mut(empty_buff, buf_length)
+ };
+ let pass = unsafe {
+    slice::from_raw_parts(pass_buff, 32)
+ }; 
+ let salt = unsafe {
+    slice::from_raw_parts(salt_buff, 24)
+ }; 
+
+
+
+ let input = BlobReader::new(empty_buff);
+
+ let mut dec_i = ChaChaReader::new(input,pass,salt);
+
+  write_pic_from_read(&mut dec_i, width, nb_line_disp).unwrap();
+
+
+}
 //function direct_display(b,ctx) {
 #[no_mangle]
 pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, length : usize, width : usize, nb_line_disp : usize) {
@@ -45,29 +120,10 @@ pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, le
 
   let input = BlobReader::new(empty_buff);
 
-  //let mut disp_buf = Vec::with_capacity(width * 4 * nb_line_disp);
-  let mut disp_buf = vec![0;width * 4 * nb_line_disp];
 
 	let mut dec_i = LZDec::new(input);
 
-  let mut y_ix = 0;
-  loop {
-    let mut i = 0;
-    while i < disp_buf.len() {
-      let nbr = dec_i.read(&mut disp_buf[i..]).unwrap();
-      if nbr == 0 {
-        break;
-      }
-      i += nbr;
-    }
-    if i == 0 {
-      break;
-    }
-    unsafe { draw_px(disp_buf.as_mut_ptr(), nb_line_disp, width, y_ix) };
-    y_ix += nb_line_disp;
-  }
-  
-
+  write_pic_from_read(&mut dec_i, width, nb_line_disp).unwrap();
 /*
   println!("string length: {}", b.len());
   let mut input = Cursor::new(data.to_bytes());
@@ -81,6 +137,30 @@ pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, le
   }*/
 }
 
+fn write_pic_from_read<R : Read>(dec_i : &mut R, width : usize, nb_line_disp : usize) -> IoResult<()> {
+  let mut disp_buf = vec![0;width * 4 * nb_line_disp];
+  let mut y_ix = 0;
+  loop {
+    let mut i = 0;
+    while i < disp_buf.len() {
+      let nbr = dec_i.read(&mut disp_buf[i..])?;
+      if nbr == 0 {
+        break;
+      }
+      i += nbr;
+    }
+    if i == 0 {
+      break;
+    }
+    unsafe { draw_px(disp_buf.as_mut_ptr(), nb_line_disp, width, y_ix) };
+    y_ix += nb_line_disp;
+  }
+ 
+  Ok(())
+}
+/*alternate impl for alloc dealloc kept for testing : issue when using cipher
+ * : memory corruption : TODO try to identify -> only after deciphering successfully a pic and
+ * changing password (not using dalloc do no solve it)
 #[no_mangle]
 pub extern "C" fn alloc(size: usize) -> *mut u8 {
   unsafe {
@@ -96,9 +176,9 @@ pub extern "C" fn dealloc(ptr: *mut u8, size: usize) {
     Heap.dealloc(ptr, layout);
   }
 }
-
-/* alternate impl for alloc dealloc kept for testing
-
+*/
+/* 
+*/
 #[no_mangle]
 pub extern "C" fn alloc(size: usize) -> *mut c_void {
   let mut buf = Vec::with_capacity(size);
@@ -113,7 +193,7 @@ pub extern "C" fn dealloc(ptr: *mut c_void, cap: usize) {
     let _buf = Vec::from_raw_parts(ptr, 0, cap);
   }
 }
-*/
+//*/
 // dummy
 fn main() {}
 
@@ -155,3 +235,89 @@ impl<'a> Read for BlobReader<'a> {
     Ok(nb_copy)
   }
 }
+struct ChaChaReader<R : Read> {
+  inner : R,
+  chacha : ChaCha20,
+  input : Vec<u8>,
+  output : Vec<u8>,
+  start_o : usize,
+  end_o : usize,
+}
+
+impl<R : Read> ChaChaReader<R> {
+  pub fn new(r : R,key : &[u8], salt : &[u8]) -> Self {
+    ChaChaReader {
+      inner : r,
+      chacha : ChaCha20::new_xchacha20(key,salt),
+      input : vec![0;64],
+      output : vec![0;64],
+      start_o : 0,
+      end_o : 0,
+    }
+  }
+}
+
+
+
+impl<R : Read> Read for ChaChaReader<R> {
+  fn read(&mut self, buf: &mut [u8]) -> IoResult<usize> {
+    if self.start_o == self.end_o {
+      // try to read full buff
+      let s = read_most(&mut self.inner, &mut self.input[..])?;
+      if s == 0 {
+        return Ok(0);
+      }
+
+      self.chacha.process(&self.input[..s], &mut self.output[..s]);
+      self.start_o = 0;
+      self.end_o = s;
+    }
+    let to_copy = min(self.end_o - self.start_o, buf.len());
+
+    let n_end = self.start_o + to_copy;
+    buf[..to_copy].copy_from_slice(&self.output[self.start_o..n_end]);
+
+    self.start_o = n_end;
+
+    Ok(to_copy)
+
+  }
+}
+
+#[inline]
+fn read_most<R : Read>(from : &mut R, to : &mut [u8]) -> IoResult<usize> {
+  let mut i = 0;
+  while i != to.len() {
+    let nb = from.read(&mut to[i..])?;
+    if nb == 0 {
+      return Ok(i);
+    }
+    i += nb;
+  }
+  Ok(i)
+}
+
+
+/*
+fn decipher(src: &Path, dst: &Path,key : &[u8], salt_bciph : &[u8]) -> IoResult<()> {
+	let mut fi = try!(File::open(src));
+	let mut fo = try!(File::create(dst));
+  // stream gen at this size
+  let mut input = vec![0;64];
+  let mut output = vec![0;64];
+  let mut xchacha20 = ChaCha20::new_xchacha20(&key, &salt_bciph);
+  loop {
+    let s = read_most(&mut fi, &mut input[..])?;
+    if s == 0 {
+      break;
+    }
+
+    xchacha20.process(&input[..s], &mut output[..s]);
+    fo.write_all(&mut output[..s])?;
+    if s != input.len() {
+      break;
+    }
+  }
+  Ok(())
+}
+*/

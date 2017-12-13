@@ -2,6 +2,7 @@
     <head>
         <style type="text/css">
             canvas { border: 1px solid black;  width: 99%; }
+            #logarea { width: 99%; }
             hidden { visibility: hidden; }
         </style>
         <script type="module">
@@ -17,13 +18,14 @@
             }
           }
 
-          function disp_canvas ({file,x,y,mode,next,previous},pass) {
+          function disp_canvas ({file,x,y,mode,modeconf={},next,previous},pass) {
 
               dirty_nav(document.getElementById('next'),next);
               dirty_nav(document.getElementById('prev'),previous);
 
               var pass = document.getElementById('pass').value;
               var canvas = document.getElementById('canvas');
+              var logarea = document.getElementById('logarea');
               var ctx = canvas.getContext('2d');
               canvas.width=x;
               canvas.height=y;
@@ -31,7 +33,7 @@
               var x = ctx.canvas.width*4;
               var y = ctx.canvas.height*4;
               ctx.fillRect(0, 0, x, y);
-              cv.download(ctx,file,mode,pass)
+              cv.download(ctx,file,mode,modeconf,pass,logarea)
           }
 
           window.cur_url= new URL(window.location.href);
@@ -60,5 +62,10 @@
         <div>
            <canvas id="canvas"></canvas>
         </div>
+        <div>
+           <textarea id="logarea" rows="50"></textarea>
+        </div>
+
+
     </body>
 </html>
