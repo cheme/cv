@@ -39,6 +39,7 @@ extern {
   fn draw_px(_ : *mut u8, _ : usize, _ : usize, _ : usize);
   fn update_from_blob(_ : *mut u8, _ : usize) -> usize;
   fn touch(_ : usize);
+  fn wasm_log(_ : *const c_char, _ : LogType);
 }
 
 #[no_mangle]
@@ -61,9 +62,7 @@ pub extern "C" fn pbkdf_test(nb_round : u32) {
   let pass = vec![8;30];
   let salt = vec![1;32];
   let mut output = vec![0;32];
-  unsafe { touch(nb_round as usize) };
   bcrypt_pbkdf(&pass[..],&salt[..],nb_round,&mut output[..]);
-  unsafe { touch(nb_round as usize +1) };
 }
 
 #[no_mangle]
@@ -219,7 +218,6 @@ impl<'a> Read for BlobReader<'a> {
       let l = self.buf.len();
       let mut nb = 0;
       let nb  = unsafe { update_from_blob(self.buf.as_mut_ptr(), l) };
-      unsafe { touch(nb as usize) };
       let nb = nb as usize;
       // unsafe { touch(self.buf[0] as usize) };
       if nb == 0 {
@@ -322,3 +320,15 @@ fn decipher(src: &Path, dst: &Path,key : &[u8], salt_bciph : &[u8]) -> IoResult<
   Ok(())
 }
 */
+
+#[repr(u8)]
+pub enum LogType { Log = 0, Error = 1, Alert = 2, }
+
+fn log_js(m : &str, t : LogType) {
+  let m = CString::new(m.as_bytes()).unwrap(); // warn panic on internal \0
+  unsafe {
+    wasm_log(m.as_ptr(), t)
+  }
+}
+
+

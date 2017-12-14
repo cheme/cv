@@ -1,17 +1,17 @@
-var x;
-var y;
-var ctx;
-var logarea;
-var blob;
-var blob_array_buff;
-var reader = new FileReader();
-var blobbuffer_size = 1024;
+let x;
+let y;
+let ctx;
+let logarea;
+let blob;
+let blob_array_buff;
+let reader = new FileReader();
+let blobbuffer_size = 1024;
 // nb line read from blob : 20
-var readerline = 20;
+let readerline = 20;
 // nb line displayed at the same time : 4
-var innerreaderline = 4;
+let innerreaderline = 4;
 
-var wasm_mod = {};
+let wasm_mod = {};
 
 function log_area(s) {
   console.log(s);
@@ -20,37 +20,37 @@ function log_area(s) {
 }
 //dim : 2480, 3508
 //rowlen : 7440
-function direct_display(b) {
-  var start = new Date();
+function direct_display() {
+  let start = new Date();
 
-  var b = blob;
+  let b = blob;
   console.log(b.size)
   console.log(b.type)
   console.log('x: ', x);
   console.log('y: ', y);
   // line counter
   ctx.sy = 0;
-  var rcb = function(r) {
+  let rcb = function(r) {
    // reader.result contains the contents of blob as a typed array
 //             console.log("in buf callback")
-    for (var i=0; i < r.result.byteLength; i+= x * innerreaderline) {
+    for (let i=0; i < r.result.byteLength; i+= x * innerreaderline) {
       draw_px_inner(new Uint8ClampedArray(r.result.slice(i,i+(x*innerreaderline))),innerreaderline,x/4,ctx.sy);
       ctx.sy += innerreaderline;
     }
 
     if (ctx.sy >= y/4) {
-        var dur = new Date() - start;
+        let dur = new Date() - start;
         log_area("Direct display took : " + dur + " ms");
     }
   };
 
-  var readersize = readerline * x;
-  for (var i=0; i < b.size; i+= readersize) {
-    var fr = preader(b,i,i+readersize).then(rcb);
+  let readersize = readerline * x;
+  for (let i=0; i < b.size; i+= readersize) {
+    let fr = preader(b,i,i+readersize).then(rcb);
     // need to run in order in firefox, use of then after resolve still lead to race (only for very small buf)
     // TODO use Promise.race
     Promise.resolve(fr);
-/*    var reader = new FileReader();
+/*    let reader = new FileReader();
     reader.addEventListener("loadend", rcb);
     reader.readAsArrayBuffer(b.slice(i,i+readersize)); 
     */
@@ -61,12 +61,28 @@ function direct_display(b) {
 function touch (ix) {
   console.log("touch : " + ix);
 }
+
+function wasm_log(msg,err) {
+  let strMsg = copyCStr(wasm_mod, msg);
+  switch (err) {
+    case 1 :
+      console.error(strMsg);
+      break;
+    case 2 :
+      alert(strMsg);
+      break;
+    default :
+      console.log(strMsg);
+  }
+}
+
 function load_wasm_mod (cb) {
   fetch("cv.wasm").then(response =>
     response.arrayBuffer()
   ).then(bytes =>
     WebAssembly.instantiate(bytes, { env: {
             touch : touch,
+            wasm_log : wasm_log,
             draw_px : draw_px,
             update_from_blob : update_from_blob,
     } })
@@ -88,80 +104,76 @@ function load_wasm_mod (cb) {
 }
 
 function compress_display(pass) {
-        var start = new Date();
-          var b = blob;
+  let start = new Date();
+  let b = blob;
   b.cur_ix = 0;
-  var dec = (r) => {
-/*var start = new Date();
+  let dec = function() {
+  
+/*let start = new Date();
           // dirty key deriv test to choose nb round
           //wasm_mod.pbkdf_test(parseInt(pass));
           wasm_mod.pbkdf_test(16);
-   var end = new Date();
+   let end = new Date();
           console.log("took " + (end - start));
           log_area("key derivation in " + (end - start) + " ms");
 */
    // TODO replace by read buffer!!
-   var start = new Date();
-   var l = r.byteLength;
+   let r = this.result;
+   let l = r.byteLength;
    blob_array_buff = r;
-   var buff_l = Math.min(l,blobbuffer_size);
-   var buf_read_add = wasm_mod.alloc(buff_l);
+   let buff_l = Math.min(l,blobbuffer_size);
+   let buf_read_add = wasm_mod.alloc(buff_l);
    wasm_mod.decompress_display(buf_read_add, buff_l,l,x / 4,innerreaderline);
           // TODO put in promise and dealloc in finally
    wasm_mod.dealloc(buf_read_add);
-   var dur = new Date() - start;
-   log_area("Lz4 uncompress and display took : " + dur + " ms");
- 
-
+   let dur = new Date() - start;
+   log_area("Lz4 uncompress (buff size " + buff_l + ") then display took : " + dur + " ms");
   };
-  var rcb = function () {
-     dec(this.result);
-  }
-  var reader = new FileReader();
-  reader.addEventListener("loadend", rcb);
+  let reader = new FileReader();
+  reader.addEventListener("loadend", dec);
   reader.readAsArrayBuffer(b); 
 }
 // TODO fuse with compress_display (use dec as param)
 function compress_enc_display(pass,modeconf) {
-  return enc_inner(pass,modeconf,wasm_mod.decompress_enc_display)
+  return enc_inner(pass,modeconf,wasm_mod.decompress_enc_display," and Lz4 uncompress")
 }
 function enc_only_display(pass,modeconf) {
-  return enc_inner(pass,modeconf,wasm_mod.enc_display)
+  return enc_inner(pass,modeconf,wasm_mod.enc_display," from uncompress blob")
 }
-function enc_inner(pass,modeconf,asm_dec) {
-    var b = blob;
+function enc_inner(pass,modeconf,asm_dec,logz4) {
+  let b = blob;
   b.cur_ix = 0;
-  var dec = (r) => {
+  let dec = function() {
 
-   var start = new Date();
+   let r = this.result;
+   let start = new Date();
 
-   var nb_round = modeconf.keyder.nbround;
+   let nb_round = modeconf.keyder.nbround;
    // dirty key der exception management
    if (pass.length == 0) {
       pass = ' ';
    }
-   var pass_bytes = stringToBytes(pass);
+   let pass_bytes = stringToBytes(pass);
    console.log("pass : " + btoa(pass_bytes));
-   var p_l = pass_bytes.length;
-   var buf_pass = wasm_mod.alloc(p_l);
-   var b_pass = new Uint8Array(wasm_mod.memory.buffer, buf_pass, p_l);
-   b_pass.set(new Uint8Array(pass_bytes));
+   let p_l = pass_bytes.length;
+   let buf_pass = wasm_mod.alloc(p_l);
+   new Uint8Array(wasm_mod.memory.buffer, buf_pass, p_l).set(new Uint8Array(pass_bytes));
   
-   var buf_salt = wasm_mod.alloc(32);
-   var b_salt = new Uint8Array(wasm_mod.memory.buffer, buf_salt, 32);
-   var byte_salt = atob(modeconf.keyder.salt);
-   for(var i = 0; i < 32; i++) {
+   let buf_salt = wasm_mod.alloc(32);
+   let b_salt = new Uint8Array(wasm_mod.memory.buffer, buf_salt, 32);
+   let byte_salt = atob(modeconf.keyder.salt);
+   for(let i = 0; i < 32; i++) {
      b_salt[i] = byte_salt.charCodeAt(i);
    }
 
-   console.log("salt : " + btoa(String.fromCharCode.apply(null, b_salt)));
+   console.log("salt bcrypt : " + btoa(String.fromCharCode.apply(null, b_salt)));
 
-   var buf_pass_der = wasm_mod.bcrypt_key_der(buf_pass, p_l, buf_salt, nb_round)
+   let buf_pass_der = wasm_mod.bcrypt_key_der(buf_pass, p_l, buf_salt, nb_round)
    wasm_mod.dealloc(buf_pass);
-   var dur = new Date() - start;
+   let dur = new Date() - start;
    log_area("bcript " + nb_round + " round key derivation in " + dur + " ms");
         
-   var bder = new Uint8Array(wasm_mod.memory.buffer, buf_pass_der, 32);
+   let bder = new Uint8Array(wasm_mod.memory.buffer, buf_pass_der, 32);
    console.log("pass der : " + btoa(String.fromCharCode.apply(null, bder)));
 
    start = new Date();
@@ -169,32 +181,27 @@ function enc_inner(pass,modeconf,asm_dec) {
    // shorter cipher salt
    b_salt = new Uint8Array(wasm_mod.memory.buffer, buf_salt, 24);
    byte_salt = atob(modeconf.salt);
-   for(var i = 0; i < 24; i++) {
+   for(let i = 0; i < 24; i++) {
      b_salt[i] = byte_salt.charCodeAt(i);
    }
 
+   console.log("salt xchacha : " + btoa(String.fromCharCode.apply(null, b_salt)));
 
 
-   // TODO replace by read buffer!!
-   var l = r.byteLength;
+   let l = r.byteLength;
    blob_array_buff = r;
-   var buff_l = Math.min(l,blobbuffer_size);
-   var buf_read_add = wasm_mod.alloc(buff_l);
+   let buff_l = Math.min(l,blobbuffer_size);
+   let buf_read_add = wasm_mod.alloc(buff_l);
    asm_dec(buf_read_add, buff_l,l,x / 4,innerreaderline,buf_pass_der,buf_salt);
           // TODO put in promise and dealloc in finally
    wasm_mod.dealloc(buf_read_add);
    wasm_mod.dealloc(buf_pass_der);
    wasm_mod.dealloc(buf_salt);
    dur = new Date() - start;
-   log_area("xChaCha20 dec and Lz4 uncompress and display took : " + dur + " ms");
- 
-
+   log_area("xChaCha20 dec (wasm buf 3*64 byte)" + logz4 + " (read buff size " + buff_l + ") and display took : " + dur + " ms");
   };
-  var rcb = function () {
-    dec(this.result);
-  }
-  var reader = new FileReader();
-  reader.addEventListener("loadend", rcb);
+  let reader = new FileReader();
+  reader.addEventListener("loadend", dec);
   reader.readAsArrayBuffer(b); 
 }
 
@@ -213,14 +220,14 @@ function load_wasm(dec) {
 
 // use by webassembly module
 function draw_px(array_pt,nb_line,line_w,y_ix) {
-  var buffer = new Uint8ClampedArray(wasm_mod.memory.buffer, array_pt, nb_line * 4 * line_w);
+  let buffer = new Uint8ClampedArray(wasm_mod.memory.buffer, array_pt, nb_line * 4 * line_w);
   draw_px_inner(buffer,nb_line,line_w,y_ix);
 }
 
 function update_from_blob(array_pt, arr_l) {
-  var end_r = Math.min(blob.cur_ix+arr_l,blob_array_buff.byteLength);
-  var length = end_r - blob.cur_ix;
-  var buffer = new Uint8Array(wasm_mod.memory.buffer, array_pt, length);
+  let end_r = Math.min(blob.cur_ix+arr_l,blob_array_buff.byteLength);
+  let length = end_r - blob.cur_ix;
+  let buffer = new Uint8Array(wasm_mod.memory.buffer, array_pt, length);
   buffer.set(new Uint8Array(blob_array_buff.slice(blob.cur_ix,end_r)));
   blob.cur_ix = end_r;
 
@@ -228,7 +235,7 @@ function update_from_blob(array_pt, arr_l) {
 }
 
 function draw_px_inner(buffer,nb_line,line_w,y_ix) {
-  var idi = new ImageData(buffer,line_w, nb_line);
+  let idi = new ImageData(buffer,line_w, nb_line);
   ctx.putImageData(idi,0,y_ix);
 }
 
@@ -245,11 +252,11 @@ function download_cv(ctx2,file,mode,mode_conf,pass,logarea2) {
     // TODO use specifiz moz event
     readerline = ctx.canvas.height;
   }*/
-  var xhr = new XMLHttpRequest();
+  let xhr = new XMLHttpRequest();
   xhr.responseType = 'blob';
   xhr.onload = () => {
     // xhr.response is a Blob
-    var url = URL.createObjectURL(xhr.response);
+    let url = URL.createObjectURL(xhr.response);
     console.log('URL: ', url);
     blob = xhr.response;
     if (mode === 'direct') {
@@ -268,7 +275,7 @@ function download_cv(ctx2,file,mode,mode_conf,pass,logarea2) {
   xhr.send();
 }
 
-var cv = {
+let cv = {
    download : download_cv
 };
 
@@ -286,17 +293,35 @@ function preader (b,start,end) {
  });
 }
 
+// copied from sample, is generator efficient ? (does not currently matter for use case)
+function copyCStr(module, ptr) {
+  let orig_ptr = ptr;
+  const collectCString = function* () {
+    let memory = new Uint8Array(module.memory.buffer);
+    while (memory[ptr] !== 0) {
+      if (memory[ptr] === undefined) { throw new Error("Tried to read undef mem") }
+      yield memory[ptr]
+      ptr += 1
+    }
+  }
 
+  const buffer_as_u8 = new Uint8Array(collectCString())
+  const utf8Decoder = new TextDecoder("UTF-8");
+  const buffer_as_utf8 = utf8Decoder.decode(buffer_as_u8);
+  module.dealloc(orig_ptr);
+  return buffer_as_utf8
+}
 
-// non utf8!!
+// non utf8!! do not use out of poc
 function stringToBytes(str) {
-var bytesv2 = []; // char codes
+let bytesv2 = []; // char codes
 
-for (var i = 0; i < str.length; ++i) {
-  var code = str.charCodeAt(i);
+for (let i = 0; i < str.length; ++i) {
+  let code = str.charCodeAt(i);
   
   bytesv2 = bytesv2.concat([code & 0xff]);
 }
 return bytesv2
 }
+
 export default cv;

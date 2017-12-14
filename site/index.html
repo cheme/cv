@@ -6,8 +6,24 @@
             hidden { visibility: hidden; }
         </style>
         <script type="module">
-          // require dom.moduleScripts.enabled under ff... TODO put in another file
+          // almost useless use of a module
           import cv from './site.js';
+        </script>
+        <script nomodule >
+          // if no module support dirty script xhr (this poc intend to use no external dependency so no module polyfill)
+          let xhr = new XMLHttpRequest();
+          xhr.responseType = 'javascript';
+          xhr.onload = () => {
+            let js = xhr.response;
+            let s = js.replace(/export\ .*;/g,'') + "window.cv = cv;";
+            //# sourceURL=site.js`;
+            eval(s);
+          };
+          xhr.open('GET',"./site.js");
+          xhr.send();
+        </script>
+        <script>
+
           function dirty_nav(n,dest) {
             if (dest == undefined) {
               n.style.visibility = "hidden";
@@ -47,6 +63,8 @@
           xhrconf.send();
 
         </script>
+
+
     </head>
     <body>
         <div>
@@ -65,7 +83,7 @@
         <div>
            <textarea id="logarea" rows="50"></textarea>
         </div>
-
+        <a href="https://github.com/cheme/cv" >source for webassembly module</a>
 
     </body>
 </html>
