@@ -66,7 +66,7 @@ pub extern "C" fn pbkdf_test(nb_round : u32) {
 }
 
 #[no_mangle]
-pub extern "C" fn decompress_enc_display(empty_buff: *mut u8, buf_length : usize, length : usize, width : usize, nb_line_disp : usize,pass_buff: *const u8,salt_buff: *const u8) {
+pub extern "C" fn decompress_enc_display(empty_buff: *mut u8, buf_length : usize, width : usize, nb_line_disp : usize,pass_buff: *const u8,salt_buff: *const u8) {
  let empty_buff = unsafe {
     slice::from_raw_parts_mut(empty_buff, buf_length)
  };
@@ -77,19 +77,25 @@ pub extern "C" fn decompress_enc_display(empty_buff: *mut u8, buf_length : usize
     slice::from_raw_parts(salt_buff, 24)
  }; 
 
+ decompress_enc_display_inner(empty_buff, width, nb_line_disp, pass,salt).unwrap_or_else(|e| {
+   log_js(format!("{:?}",e), LogType::Error);
+ });
+}
 
+#[inline]
+fn decompress_enc_display_inner(empty_buff: &mut [u8], width : usize, nb_line_disp : usize,pass: &[u8],salt: &[u8]) -> IoResult<()> {
+  let input = BlobReader::new(empty_buff);
 
- let input = BlobReader::new(empty_buff);
+  let dec_read = ChaChaReader::new(input,pass,salt);
 
- let dec_read = ChaChaReader::new(input,pass,salt);
- let mut dec_i = LZDec::new(dec_read);
+  let mut dec_i = LZDec::new(dec_read);
 
-  write_pic_from_read(&mut dec_i, width, nb_line_disp).unwrap();
-
+  write_pic_from_read(&mut dec_i, width, nb_line_disp)?;
+  Ok(())
 }
 
 #[no_mangle]
-pub extern "C" fn enc_display(empty_buff: *mut u8, buf_length : usize, length : usize, width : usize, nb_line_disp : usize,pass_buff: *const u8,salt_buff: *const u8) {
+pub extern "C" fn enc_display(empty_buff: *mut u8, buf_length : usize, width : usize, nb_line_disp : usize,pass_buff: *const u8,salt_buff: *const u8) {
  let empty_buff = unsafe {
     slice::from_raw_parts_mut(empty_buff, buf_length)
  };
@@ -100,19 +106,25 @@ pub extern "C" fn enc_display(empty_buff: *mut u8, buf_length : usize, length : 
     slice::from_raw_parts(salt_buff, 24)
  }; 
 
+ enc_display_inner(empty_buff, width, nb_line_disp, pass, salt).unwrap_or_else(|e| {
+   log_js(format!("{:?}",e), LogType::Error);
+ });
 
+}
 
- let input = BlobReader::new(empty_buff);
+#[inline]
+fn enc_display_inner(empty_buff: &mut [u8], width : usize, nb_line_disp : usize,pass: &[u8], salt: &[u8]) -> IoResult<()> {
+  let input = BlobReader::new(empty_buff);
 
- let mut dec_i = ChaChaReader::new(input,pass,salt);
+  let mut dec_i = ChaChaReader::new(input,pass,salt);
 
-  write_pic_from_read(&mut dec_i, width, nb_line_disp).unwrap();
-
+  write_pic_from_read(&mut dec_i, width, nb_line_disp)?;
+  Ok(())
 
 }
 //function direct_display(b,ctx) {
 #[no_mangle]
-pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, length : usize, width : usize, nb_line_disp : usize) {
+pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, width : usize, nb_line_disp : usize) {
   let empty_buff = unsafe {
     slice::from_raw_parts_mut(empty_buff, buf_length)
   }; 
@@ -122,7 +134,9 @@ pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, le
 
 	let mut dec_i = LZDec::new(input);
 
-  write_pic_from_read(&mut dec_i, width, nb_line_disp).unwrap();
+  write_pic_from_read(&mut dec_i, width, nb_line_disp).unwrap_or_else(|e| {
+   log_js(format!("{:?}",e), LogType::Error);
+  });
 /*
   println!("string length: {}", b.len());
   let mut input = Cursor::new(data.to_bytes());
@@ -216,7 +230,6 @@ impl<'a> Read for BlobReader<'a> {
 
     if self.ix == self.end {
       let l = self.buf.len();
-      let mut nb = 0;
       let nb  = unsafe { update_from_blob(self.buf.as_mut_ptr(), l) };
       let nb = nb as usize;
       // unsafe { touch(self.buf[0] as usize) };
@@ -324,8 +337,8 @@ fn decipher(src: &Path, dst: &Path,key : &[u8], salt_bciph : &[u8]) -> IoResult<
 #[repr(u8)]
 pub enum LogType { Log = 0, Error = 1, Alert = 2, }
 
-fn log_js(m : &str, t : LogType) {
-  let m = CString::new(m.as_bytes()).unwrap(); // warn panic on internal \0
+fn log_js(m : String, t : LogType) {
+  let m = CString::new(m.into_bytes()).unwrap(); // warn panic on internal \0
   unsafe {
     wasm_log(m.as_ptr(), t)
   }

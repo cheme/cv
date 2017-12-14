@@ -5,23 +5,6 @@
             #logarea { width: 99%; }
             hidden { visibility: hidden; }
         </style>
-        <script type="module">
-          // almost useless use of a module
-          import cv from './site.js';
-        </script>
-        <script nomodule >
-          // if no module support dirty script xhr (this poc intend to use no external dependency so no module polyfill)
-          let xhr = new XMLHttpRequest();
-          xhr.responseType = 'javascript';
-          xhr.onload = () => {
-            let js = xhr.response;
-            let s = js.replace(/export\ .*;/g,'') + "window.cv = cv;";
-            //# sourceURL=site.js`;
-            eval(s);
-          };
-          xhr.open('GET',"./site.js");
-          xhr.send();
-        </script>
         <script>
 
           function dirty_nav(n,dest) {
@@ -34,7 +17,7 @@
             }
           }
 
-          function disp_canvas ({file,x,y,mode,modeconf={},next,previous},pass) {
+          function disp_canvas (cv,{file,x,y,mode,modeconf={},next,previous},pass) {
 
               dirty_nav(document.getElementById('next'),next);
               dirty_nav(document.getElementById('prev'),previous);
@@ -52,16 +35,42 @@
               cv.download(ctx,file,mode,modeconf,pass,logarea)
           }
 
+          function pic_load_json_conf(cv) {
           window.cur_url= new URL(window.location.href);
           window.xhrconf = new XMLHttpRequest();
           xhrconf.responseType = 'json';
           xhrconf.onload = function() {
-            disp_canvas(this.response);
+            window.current_conf = this.response;
+            if (window.current_conf.modeconf == undefined) {
+                    window.current_conf.modeconf = {};
+            }
+            disp_canvas(cv,window.current_conf);
           }
 
           xhrconf.open('GET','./'+ cur_url.search.substring(1) + '.json');
           xhrconf.send();
+          }
 
+        </script>
+        <script type="module">
+          // almost useless use of a module
+          import cv from './site.js';
+          window.cv = cv;
+          pic_load_json_conf(cv);
+        </script>
+        <script nomodule >
+          // if no module support dirty script xhr (this poc intend to use no external dependency so no module polyfill)
+          let xhr = new XMLHttpRequest();
+          xhr.responseType = 'javascript';
+          xhr.onload = () => {
+            let js = xhr.response;
+            let s = js.replace(/export\ .*;/g,'') + "window.cv = cv;";
+            //# sourceURL=site.js`;
+            eval(s);
+            pic_load_json_conf(cv);
+          };
+          xhr.open('GET',"./site.js");
+          xhr.send();
         </script>
 
 
@@ -71,10 +80,14 @@
            <span >
              <a id="prev">prev</a>
            </span>
-           Passphrase: <input id="pass" type="text" oninput="xhrconf.onload()" />
+           Passphrase: <input id="pass" type="text" oninput="disp_canvas(cv,window.current_conf)" />
            <span >
              <a id="next">next</a>
            </span>
+           <br />
+           Nb line disp at once: <input id="nb_line" value="4" type="number" oninput="window.current_conf.modeconf.nb_line_disp = this.value; disp_canvas(cv,window.current_conf)" />
+           <br />
+           Blob read buffer size: <input id="bb_size" value="1024" type="number" oninput="window.current_conf.modeconf.read_buffer_size = this.value; disp_canvas(cv,window.current_conf)" />
         </div>
         
         <div>

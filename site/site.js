@@ -63,7 +63,7 @@ function touch (ix) {
 }
 
 function wasm_log(msg,err) {
-  let strMsg = copyCStr(wasm_mod, msg);
+  let strMsg = "Webassembly error : " + copyCStr(wasm_mod, msg);
   switch (err) {
     case 1 :
       console.error(strMsg);
@@ -123,7 +123,7 @@ function compress_display(pass) {
    blob_array_buff = r;
    let buff_l = Math.min(l,blobbuffer_size);
    let buf_read_add = wasm_mod.alloc(buff_l);
-   wasm_mod.decompress_display(buf_read_add, buff_l,l,x / 4,innerreaderline);
+   wasm_mod.decompress_display(buf_read_add, buff_l,x / 4,innerreaderline);
           // TODO put in promise and dealloc in finally
    wasm_mod.dealloc(buf_read_add);
    let dur = new Date() - start;
@@ -192,7 +192,7 @@ function enc_inner(pass,modeconf,asm_dec,logz4) {
    blob_array_buff = r;
    let buff_l = Math.min(l,blobbuffer_size);
    let buf_read_add = wasm_mod.alloc(buff_l);
-   asm_dec(buf_read_add, buff_l,l,x / 4,innerreaderline,buf_pass_der,buf_salt);
+   asm_dec(buf_read_add, buff_l,x / 4,innerreaderline,buf_pass_der,buf_salt);
           // TODO put in promise and dealloc in finally
    wasm_mod.dealloc(buf_read_add);
    wasm_mod.dealloc(buf_pass_der);
@@ -241,6 +241,13 @@ function draw_px_inner(buffer,nb_line,line_w,y_ix) {
 
 
 function download_cv(ctx2,file,mode,mode_conf,pass,logarea2) {
+  if (mode_conf.read_buffer_size != undefined) {
+    blobbuffer_size = mode_conf.read_buffer_size;
+  }
+  if (mode_conf.nb_line_disp != undefined) {
+    innerreaderline = mode_conf.nb_line_disp;
+  }
+
   ctx = ctx2;
   logarea = logarea2;
   log_area("Using canvas " + ctx.canvas.width + "px per " + ctx.canvas.height + "px");
