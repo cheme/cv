@@ -217,15 +217,14 @@ function draw_px(array_pt,nb_line,line_w,y_ix) {
   draw_px_inner(buffer,nb_line,line_w,y_ix);
 }
 
-function update_from_blob(array_pt, arr_l, ret_l) {
+function update_from_blob(array_pt, arr_l) {
   var end_r = Math.min(blob.cur_ix+arr_l,blob_array_buff.byteLength);
   var length = end_r - blob.cur_ix;
   var buffer = new Uint8Array(wasm_mod.memory.buffer, array_pt, length);
   buffer.set(new Uint8Array(blob_array_buff.slice(blob.cur_ix,end_r)));
   blob.cur_ix = end_r;
 
-  var res_buf = new Uint8Array(wasm_mod.memory.buffer, ret_l, 4);
-  putInt32Bytes( length,res_buf );
+  return length;
 }
 
 function draw_px_inner(buffer,nb_line,line_w,y_ix) {
@@ -288,14 +287,6 @@ function preader (b,start,end) {
 }
 
 
-function putInt32Bytes( x,bytes ){
-    var i = 0;
-    do {
-    bytes[i++] = x & (255);
-    x = x>>8;
-    } while ( i < 4 )
-    return bytes;
-}
 
 // non utf8!!
 function stringToBytes(str) {

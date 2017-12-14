@@ -37,7 +37,7 @@ use std::io::{
 extern {
 //function draw_px(array,ctx,nb_line,line_w,y_ix) {
   fn draw_px(_ : *mut u8, _ : usize, _ : usize, _ : usize);
-  fn update_from_blob(_ : *mut u8, _ : usize, _ : *mut i32);
+  fn update_from_blob(_ : *mut u8, _ : usize) -> usize;
   fn touch(_ : usize);
 }
 
@@ -218,7 +218,8 @@ impl<'a> Read for BlobReader<'a> {
     if self.ix == self.end {
       let l = self.buf.len();
       let mut nb = 0;
-      unsafe { update_from_blob(self.buf.as_mut_ptr(), l, &mut nb) };
+      let nb  = unsafe { update_from_blob(self.buf.as_mut_ptr(), l) };
+      unsafe { touch(nb as usize) };
       let nb = nb as usize;
       // unsafe { touch(self.buf[0] as usize) };
       if nb == 0 {
