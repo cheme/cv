@@ -2,6 +2,10 @@
     <head>
         <style type="text/css">
             canvas { border: 1px solid black;  width: 99%; }
+            fieldset { border: 0px; }
+            fieldset > label { width: 200px; float: left;}
+            fieldset > input { float: left; }
+            fieldset > br { clear: left; }
             #logarea { width: 99%; }
             hidden { visibility: hidden; }
         </style>
@@ -17,38 +21,57 @@
             }
           }
 
-          function disp_canvas (cv,{file,x,y,mode,modeconf={},next,previous},pass) {
+          function disp_canvas (cv,{file,x,y,mode,modeconf={},next,previous,pdf},pass) {
 
-              dirty_nav(document.getElementById('next'),next);
-              dirty_nav(document.getElementById('prev'),previous);
+            dirty_nav(document.getElementById('next'),next);
+            dirty_nav(document.getElementById('prev'),previous);
+            if (pdf == undefined) {
+              document.getElementById('down_pdf').style.visibility = "hidden";
+            } else {
+              if (window.reg == undefined) {
+                document.getElementById('down_pdf').addEventListener('click', 
+                  function (event) {
+                    down_pdf(window.cv,window.current_conf,pass);
+                    event.preventDefault();
+                  });
+                window.reg = true;
+              }
+            }
 
-              var pass = document.getElementById('pass').value;
-              var canvas = document.getElementById('canvas');
-              var logarea = document.getElementById('logarea');
-              var ctx = canvas.getContext('2d');
-              canvas.width=x;
-              canvas.height=y;
-              ctx.fillStyle = 'green';
-              var x = ctx.canvas.width*4;
-              var y = ctx.canvas.height*4;
-              ctx.fillRect(0, 0, x, y);
-              cv.download(ctx,file,mode,modeconf,pass,logarea)
+            var pass = document.getElementById('pass').value;
+            var canvas = document.getElementById('canvas');
+            var logarea = document.getElementById('logarea');
+            var ctx = canvas.getContext('2d');
+            canvas.width=x;
+            canvas.height=y;
+            ctx.fillStyle = 'green';
+            var x = ctx.canvas.width*4;
+            var y = ctx.canvas.height*4;
+            ctx.fillRect(0, 0, x, y);
+            cv.download(ctx,file,mode,modeconf,pass,logarea)
           }
+
+
+          function down_pdf (cv,{modeconf={},pdf}) {
+            var pass = document.getElementById('pass').value;
+            cv.download_pdf(pdf,modeconf,pass)
+          }
+
 
           function pic_load_json_conf(cv) {
-          window.cur_url= new URL(window.location.href);
-          window.xhrconf = new XMLHttpRequest();
-          xhrconf.responseType = 'json';
-          xhrconf.onload = function() {
-            window.current_conf = this.response;
-            if (window.current_conf.modeconf == undefined) {
-                    window.current_conf.modeconf = {};
+            window.cur_url= new URL(window.location.href);
+            window.xhrconf = new XMLHttpRequest();
+            xhrconf.responseType = 'json';
+            xhrconf.onload = function() {
+              window.current_conf = this.response;
+              if (window.current_conf.modeconf == undefined) {
+                window.current_conf.modeconf = {};
+              }
+              disp_canvas(cv,window.current_conf);
             }
-            disp_canvas(cv,window.current_conf);
-          }
 
-          xhrconf.open('GET','./'+ cur_url.search.substring(1) + '.json');
-          xhrconf.send();
+            xhrconf.open('GET','./'+ cur_url.search.substring(1) + '.json');
+            xhrconf.send();
           }
 
         </script>
@@ -84,10 +107,17 @@
            <span >
              <a id="next">next</a>
            </span>
-           <br />
-           Nb line disp at once: <input id="nb_line" value="4" type="number" oninput="window.current_conf.modeconf.nb_line_disp = this.value; disp_canvas(cv,window.current_conf)" />
-           <br />
-           Blob read buffer size: <input id="bb_size" value="1024" type="number" oninput="window.current_conf.modeconf.read_buffer_size = this.value; disp_canvas(cv,window.current_conf)" />
+           <div>
+
+          <fieldset>
+            <label>Nb line disp at once: </label>
+            <input id="nb_line" value="4" type="number" oninput="window.current_conf.modeconf.nb_line_disp = this.value; disp_canvas(cv,window.current_conf)" />
+            <br />
+            <label>Blob read buffer size: </label>
+            <input id="bb_size" value="1024" type="number" oninput="window.current_conf.modeconf.read_buffer_size = this.value; disp_canvas(cv,window.current_conf)" />
+            <br />
+           </fieldset>
+           <div ><a id="down_pdf" href="#" >Download as pdf (warning with incorrect passphrase pdf is obviously corrupt)</a></div>
         </div>
         
         <div>

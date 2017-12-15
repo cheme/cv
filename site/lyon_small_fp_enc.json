@@ -10,6 +10,13 @@
                         "salt" : "lmBfs1LEC2/yb+P6IAqioqhqKKPreEfMLrJd9AhiDYY="
                 },
                 "type" : "xchacha20",
-                "salt" : "Y6O56Z+YnkLlEI/M6abMtkqxYc7rRlIW"
-        }
+                "salt" : "Y6O56Z+YnkLlEI/M6abMtkqxYc7rRlIW",
+                "pdfkeyder" : {
+                        "type" : "bcript",
+                        "nbround" : "16",
+                        "salt" : "zmdbjD88+SRZEJWxWf7GLoOffADn4dOE9cke4pBkaXA="
+                },
+                "pdfsalt" : "cjow1exrNRuAnDXvFJNgpcc20uDEA6TS"
+        },
+        "pdf" : "../output/bitcoin.pdf_enc"
 }

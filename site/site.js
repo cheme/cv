@@ -4,6 +4,7 @@ let ctx;
 let logarea;
 let blob;
 let blob_array_buff;
+let blob_down_buffs = [];
 let reader = new FileReader();
 let blobbuffer_size = 1024;
 // nb line read from blob : 20
@@ -31,8 +32,8 @@ function direct_display() {
   // line counter
   ctx.sy = 0;
   let rcb = function(r) {
-   // reader.result contains the contents of blob as a typed array
-//             console.log("in buf callback")
+    // reader.result contains the contents of blob as a typed array
+    // console.log("in buf callback")
     for (let i=0; i < r.result.byteLength; i+= x * innerreaderline) {
       draw_px_inner(new Uint8ClampedArray(r.result.slice(i,i+(x*innerreaderline))),innerreaderline,x/4,ctx.sy);
       ctx.sy += innerreaderline;
@@ -85,6 +86,7 @@ function load_wasm_mod (cb) {
             wasm_log : wasm_log,
             draw_px : draw_px,
             update_from_blob : update_from_blob,
+            down_buf_add : down_buf_add,
     } })
   ).then(results => {
     console.log("got instance");
@@ -96,6 +98,7 @@ function load_wasm_mod (cb) {
     wasm_mod.decompress_display  = mod.exports.decompress_display;
     wasm_mod.decompress_enc_display  = mod.exports.decompress_enc_display;
     wasm_mod.enc_display  = mod.exports.enc_display;
+    wasm_mod.enc_download  = mod.exports.enc_download;
     wasm_mod.bcrypt_key_der  = mod.exports.bcrypt_key_der;
     wasm_mod.memory = mod.exports.memory;
     wasm_mod.pbkdf_test = mod.exports.pbkdf_test;
@@ -135,12 +138,16 @@ function compress_display(pass) {
 }
 // TODO fuse with compress_display (use dec as param)
 function compress_enc_display(pass,modeconf) {
-  return enc_inner(pass,modeconf,wasm_mod.decompress_enc_display," and Lz4 uncompress")
+  return enc_inner(pass,modeconf,wasm_mod.decompress_enc_display," and Lz4 uncompress", false)
 }
 function enc_only_display(pass,modeconf) {
-  return enc_inner(pass,modeconf,wasm_mod.enc_display," from uncompress blob")
+  return enc_inner(pass,modeconf,wasm_mod.enc_display," from uncompress blob", false)
 }
-function enc_inner(pass,modeconf,asm_dec,logz4) {
+function enc_down_pdf(pass,modeconf) {
+  return enc_inner(pass,modeconf,wasm_mod.enc_download," from pdf blob", true)
+}
+
+function enc_inner(pass,modeconf,asm_dec,logz4, is_pdf_down) {
   let b = blob;
   b.cur_ix = 0;
   let dec = function() {
@@ -148,7 +155,19 @@ function enc_inner(pass,modeconf,asm_dec,logz4) {
    let r = this.result;
    let start = new Date();
 
-   let nb_round = modeconf.keyder.nbround;
+   let nb_round;
+   let keyder_salt;
+   let ciph_salt;
+   if (is_pdf_down) {
+     ciph_salt = modeconf.pdfsalt;
+     nb_round = modeconf.pdfkeyder.nbround;
+     keyder_salt = modeconf.pdfkeyder.salt;
+     blob_down_buffs = [];
+   } else {
+     ciph_salt = modeconf.salt;
+     nb_round = modeconf.keyder.nbround;
+     keyder_salt = modeconf.keyder.salt;
+   }
    // dirty key der exception management
    if (pass.length == 0) {
       pass = ' ';
@@ -161,7 +180,7 @@ function enc_inner(pass,modeconf,asm_dec,logz4) {
   
    let buf_salt = wasm_mod.alloc(32);
    let b_salt = new Uint8Array(wasm_mod.memory.buffer, buf_salt, 32);
-   let byte_salt = atob(modeconf.keyder.salt);
+   let byte_salt = atob(keyder_salt);
    for(let i = 0; i < 32; i++) {
      b_salt[i] = byte_salt.charCodeAt(i);
    }
@@ -180,7 +199,7 @@ function enc_inner(pass,modeconf,asm_dec,logz4) {
 
    // shorter cipher salt
    b_salt = new Uint8Array(wasm_mod.memory.buffer, buf_salt, 24);
-   byte_salt = atob(modeconf.salt);
+   byte_salt = atob(ciph_salt);
    for(let i = 0; i < 24; i++) {
      b_salt[i] = byte_salt.charCodeAt(i);
    }
@@ -192,17 +211,40 @@ function enc_inner(pass,modeconf,asm_dec,logz4) {
    blob_array_buff = r;
    let buff_l = Math.min(l,blobbuffer_size);
    let buf_read_add = wasm_mod.alloc(buff_l);
+
    asm_dec(buf_read_add, buff_l,x / 4,innerreaderline,buf_pass_der,buf_salt);
           // TODO put in promise and dealloc in finally
    wasm_mod.dealloc(buf_read_add);
    wasm_mod.dealloc(buf_pass_der);
    wasm_mod.dealloc(buf_salt);
    dur = new Date() - start;
-   log_area("xChaCha20 dec (wasm buf 3*64 byte)" + logz4 + " (read buff size " + buff_l + ") and display took : " + dur + " ms");
+   let add_log;
+   if (is_pdf_down) {
+     load_result_pdf_blog();
+     add_log = " and new down blog init took";
+   } else {
+     add_log = " and display took";
+   }
+   log_area("xChaCha20 dec (wasm buf 3*64 byte)" + logz4 + " (read buff size " + buff_l + ")" + add_log + " : " + dur + " ms");
   };
   let reader = new FileReader();
   reader.addEventListener("loadend", dec);
   reader.readAsArrayBuffer(b); 
+}
+
+function load_result_pdf_blog() {
+  let file = new Blob(blob_down_buffs, {type: 'application/pdf'});
+  let fileURL = URL.createObjectURL(file);
+  window.open(fileURL);
+  blob_down_buffs = [];
+}
+
+function down_buf_add(buf, buf_l) {
+
+  let buffer = new Uint8Array(buf_l);
+  buffer.set(new Uint8Array(wasm_mod.memory.buffer, buf, buf_l));
+  blob_down_buffs.push(buffer);
+
 }
 
 function load_wasm(dec) {
@@ -281,9 +323,28 @@ function download_cv(ctx2,file,mode,mode_conf,pass,logarea2) {
   xhr.open('GET',file);
   xhr.send();
 }
+function download_pdf(file,mode_conf,pass,logarea2) {
+  if (mode_conf.read_buffer_size != undefined) {
+    blobbuffer_size = mode_conf.read_buffer_size;
+  }
+  log_area("Download of a pdf with canvas read buf size " + mode_conf.read_buffer_size);
+  let xhr = new XMLHttpRequest();
+  xhr.responseType = 'blob';
+  xhr.onload = () => {
+    // xhr.response is a Blob
+    let url = URL.createObjectURL(xhr.response);
+    console.log('URL: ', url);
+    blob = xhr.response;
+    load_wasm(() => enc_down_pdf(pass,mode_conf));
+  };
+  xhr.open('GET',file);
+  xhr.send();
+}
+
 
 let cv = {
-   download : download_cv
+   download : download_cv,
+   download_pdf : download_pdf,
 };
 
 

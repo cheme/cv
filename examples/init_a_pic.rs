@@ -31,6 +31,7 @@ use std::io::{
   Result as IoResult,
 };
 const inputspath : &str = "./input/";
+const inputspdf : &str = "./input.pdf";
 const outputspath : &str = "./output/";
 const passphrase : &str = "minepassphrase";
 const nbround : u32 = 16;
@@ -39,6 +40,8 @@ fn main() {
     let e = e.unwrap();
     transform(e.path(),e.file_name()).unwrap();
   }
+  transform_pdf(PathBuf::from(inputspdf)).unwrap();
+
 }
 
 fn transform(file : PathBuf, file_name : OsString) -> IoResult<()> {
@@ -91,6 +94,28 @@ fn transform(file : PathBuf, file_name : OsString) -> IoResult<()> {
   decipher(dest_path(dest,file_name,"_c2_enc").as_path(),dest_path(dest,file_name,"_c2_dec").as_path(),&pass_bytes[..],&salt_c2[..])?;
 
 
+  Ok(())
+}
+
+fn transform_pdf(file : PathBuf) -> IoResult<()> {
+
+  let dest = PathBuf::from(outputspath);
+  let dest = &dest;
+  //compress(file.as_path(),dest_path(dest,file_name,"_c1").as_path())?;
+  // check decompress with rust impl
+  let mut salt = vec![0;32];
+  let mut pass_bytes = vec![0;32];
+  OsRng::new().unwrap().fill_bytes(&mut salt);
+  let salt = salt;
+  bcrypt_pbkdf(&passphrase.as_bytes()[..],&salt[..],nbround,&mut pass_bytes[..]);
+  println!("passphrase : {}", &passphrase);
+  println!("passphrasebyte : {}", base64::encode(&passphrase.as_bytes()));
+  println!("salt : {}", base64::encode(&salt));
+  println!("nbround : {}", nbround);
+  println!("derived key : {}", base64::encode(&pass_bytes));
+
+
+  let salt_c1 = encipher(file.as_path(),dest_path(dest,&OsString::from("output.pdf"),"_enc").as_path(),&pass_bytes[..])?;
   Ok(())
 }
 

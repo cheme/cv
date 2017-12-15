@@ -37,6 +37,7 @@ use std::io::{
 extern {
 //function draw_px(array,ctx,nb_line,line_w,y_ix) {
   fn draw_px(_ : *mut u8, _ : usize, _ : usize, _ : usize);
+  fn down_buf_add(_ : *const u8, _ : usize);
   fn update_from_blob(_ : *mut u8, _ : usize) -> usize;
   fn touch(_ : usize);
   fn wasm_log(_ : *const c_char, _ : LogType);
@@ -150,6 +151,34 @@ pub extern "C" fn decompress_display(empty_buff: *mut u8, buf_length : usize, wi
   }*/
 }
 
+#[no_mangle]
+pub extern "C" fn enc_download(empty_buff: *mut u8, buf_length : usize, width : usize, nb_line_disp : usize,pass_buff: *const u8,salt_buff: *const u8) {
+ let empty_buff = unsafe {
+    slice::from_raw_parts_mut(empty_buff, buf_length)
+ };
+ let pass = unsafe {
+    slice::from_raw_parts(pass_buff, 32)
+ }; 
+ let salt = unsafe {
+    slice::from_raw_parts(salt_buff, 24)
+ };
+
+ let input = BlobReader::new(empty_buff);
+
+ let mut dec_i = ChaChaReader::new(input,pass,salt);
+
+ // same buf write size rules as for display
+ // buf should be global const but no clear use case here
+ let buf_w_l = width * 4 * nb_line_disp;
+
+ down_from_read(&mut dec_i, buf_w_l).unwrap_or_else(|e| {
+   log_js(format!("{:?}",e), LogType::Error);
+ });
+}
+
+
+
+
 fn write_pic_from_read<R : Read>(dec_i : &mut R, width : usize, nb_line_disp : usize) -> IoResult<()> {
   let mut disp_buf = vec![0;width * 4 * nb_line_disp];
   let mut y_ix = 0;
@@ -171,6 +200,27 @@ fn write_pic_from_read<R : Read>(dec_i : &mut R, width : usize, nb_line_disp : u
  
   Ok(())
 }
+fn down_from_read<R : Read>(dec_i : &mut R, w_b_len : usize) -> IoResult<()> {
+  // TODO read buf could be use (nice to have)
+  let mut disp_buf = vec![0;w_b_len];
+  loop {
+    let mut i = 0;
+    while i < disp_buf.len() {
+      let nbr = dec_i.read(&mut disp_buf[i..])?;
+      if nbr == 0 {
+        break;
+      }
+      i += nbr;
+    }
+    if i == 0 {
+      break;
+    }
+    unsafe { down_buf_add(disp_buf.as_mut_ptr(), i) };
+  }
+ 
+  Ok(())
+}
+
 /*alternate impl for alloc dealloc kept for testing : issue when using cipher
  * : memory corruption : TODO try to identify -> only after deciphering successfully a pic and
  * changing password (not using dalloc do no solve it)
