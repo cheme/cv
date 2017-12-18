@@ -19,6 +19,17 @@
               n.style.visibility = "visible";
               n.href = "?" + dest;
             }
+            if (n.has_event == undefined) {
+            n.addEventListener('click', 
+              function (event) {
+
+                nurl = new URL(n.href);
+                let cid = nurl.search.substring(1);
+                pic_load_json_conf(window.cv,cid);
+                event.preventDefault();
+            });
+            n.has_event = true;
+            }
           }
 
           function disp_canvas (cv,{file,x,y,mode,modeconf={},next,previous,pdf},pass) {
@@ -58,8 +69,7 @@
           }
 
 
-          function pic_load_json_conf(cv) {
-            window.cur_url= new URL(window.location.href);
+          function pic_load_json_conf(cv,cid) {
             window.xhrconf = new XMLHttpRequest();
             xhrconf.responseType = 'json';
             xhrconf.onload = function() {
@@ -70,7 +80,7 @@
               disp_canvas(cv,window.current_conf);
             }
 
-            xhrconf.open('GET','./'+ cur_url.search.substring(1) + '.json');
+            xhrconf.open('GET','./'+ cid + '.json');
             xhrconf.send();
           }
 
@@ -79,7 +89,9 @@
           // almost useless use of a module
           import cv from './site.js';
           window.cv = cv;
-          pic_load_json_conf(cv);
+          window.cur_url= new URL(window.location.href);
+          let cid = cur_url.search.substring(1);
+          pic_load_json_conf(cv,cid);
         </script>
         <script nomodule >
           // if no module support dirty script xhr (this poc intend to use no external dependency so no module polyfill)
@@ -90,7 +102,9 @@
             let s = js.replace(/export\ .*;/g,'') + "window.cv = cv;";
             //# sourceURL=site.js`;
             eval(s);
-            pic_load_json_conf(cv);
+            window.cur_url= new URL(window.location.href);
+            let cid = cur_url.search.substring(1);
+            pic_load_json_conf(cv,cid);
           };
           xhr.open('GET',"./site.js");
           xhr.send();
