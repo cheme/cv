@@ -235,8 +235,9 @@ function enc_inner(pass,modeconf,asm_dec,logz4, is_pdf_down) {
 function load_result_pdf_blog() {
   let file = new Blob(blob_down_buffs, {type: 'application/pdf'});
   let fileURL = URL.createObjectURL(file);
-  window.open(fileURL);
-  blob_down_buffs = [];
+//  window.open(fileURL);
+  window.location.href = fileURL;
+  //blob_down_buffs = [];
 }
 
 function down_buf_add(buf, buf_l) {
