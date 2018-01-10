@@ -1,0 +1,16 @@
+{
+        "file" : "../output/s3.png_c2_enc",
+        "x" : 1653,
+        "y" : 1606,
+        "mode" : "compress_enc",
+        "previous" : "s2",
+        "modeconf" : {
+                "keyder" : {
+                        "type" : "bcript",
+                        "nbround" : "16",
+                        "salt" : "brlyV3d13LWs/d2myNDpAB1aKG9XMt0NQ2OwxYvetVc="
+                },
+                "type" : "xchacha20",
+                "salt" : "ClAfULthNJZcSaM3lKlMGOrKAZLJDP4Z"
+        }
+}

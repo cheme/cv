@@ -1,0 +1,24 @@
+{
+        "file" : "../output/r0.png_fp_enc",
+        "x" : 200,
+        "y" : 214,
+        "next" : "r1",
+        "mode" : "enc_only",
+        "modeconf" : {
+                "keyder" : {
+                        "type" : "bcript",
+                        "nbround" : "16",
+                        "salt" : "9/5ca3/Ci82QOFcVsC7q33Mby9TRRROIOCG+pD3K0JI="
+                },
+                "type" : "xchacha20",
+                "salt" : "d5y5ugwiplB2lkDAeyByOArs+mEaci+F",
+                "pdfkeyder" : {
+                        "type" : "bcript",
+                        "nbround" : "16",
+                        "salt" : "uRxOhPvppPkIGo+PoRePFGyMqtG3PuwyOa3pbr7Nixo="
+                },
+                "pdfsalt" : "yh04WPhCbAzYkvBcHEWg0V//6SLmnB6L"
+
+        },
+        "pdf" : "../output/r.pdf_enc"
+}

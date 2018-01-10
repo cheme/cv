@@ -1,0 +1,16 @@
+{
+        "file" : "../output/t3.png_c2_enc",
+        "x" : 1653,
+        "y" : 1166,
+        "mode" : "compress_enc",
+        "previous" : "t2",
+        "modeconf" : {
+                "keyder" : {
+                        "type" : "bcript",
+                        "nbround" : "16",
+                        "salt" : "QGPcm47CdgAu+GyY2j1+94IKps+jsW5AYpsbSROGh8o="
+                },
+                "type" : "xchacha20",
+                "salt" : "0p3utKt2cSn97a0qn6cgHrMEh4L37H9k"
+        }
+}
