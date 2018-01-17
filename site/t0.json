@@ -2,7 +2,7 @@
         "file" : "../output/t0.png_fp_enc",
         "x" : 200,
         "y" : 214,
-        "next" : "p1",
+        "next" : "t1",
         "mode" : "enc_only",
         "modeconf" : {
                 "keyder" : {
